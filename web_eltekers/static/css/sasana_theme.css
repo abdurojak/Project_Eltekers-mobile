@@ -1,0 +1,30 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+}
+
+input, select, textarea {
+    border-radius: 0.5rem;
+    border: 1px solid #ced4da;
+    padding: 0.75rem;
+}
+
+input:focus, textarea:focus, select:focus {
+    border-color: #0d47a1;
+    box-shadow: 0 0 0 0.25rem rgba(13, 71, 161, 0.25);
+    outline: none;
+}
+
+.card {
+    border-radius: 1rem;
+}
+
+.btn-primary {
+    background-color: #0d47a1;
+    border-color: #0d47a1;
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+}
+
+.btn-primary:hover {
+    background-color: #08306b;
+}
