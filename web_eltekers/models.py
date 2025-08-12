@@ -38,10 +38,23 @@ class Sasana(models.Model):
 #    pengurus_sasana = models.OneToOneField(PengurusSasana, on_delete=models.CASCADE)
 
 class JadwalLatihan(models.Model):
+    HARI_CHOICES = [
+        ('Senin', 'Senin'),
+        ('Selasa', 'Selasa'),
+        ('Rabu', 'Rabu'),
+        ('Kamis', 'Kamis'),
+        ('Jumat', 'Jumat'),
+        ('Sabtu', 'Sabtu'),
+        ('Minggu', 'Minggu'),
+    ]
+
     id_jadwal = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    tanggal_latihan = models.DateField()
+    hari = models.CharField(max_length=10, choices=HARI_CHOICES, default='Minggu')
     jam_latihan = models.TimeField()
-    sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE)
+    sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return f"{self.hari}, {self.jam_latihan}"
 
 class Instruktur(models.Model):
     id_instruktur = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

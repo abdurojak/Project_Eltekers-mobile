@@ -1,6 +1,11 @@
 from django.shortcuts import get_object_or_404, render, redirect
 from .forms import SasanaForm, PesertaForm, InstrukturForm
-from .models import Sasana, Instruktur, Peserta
+from .models import Sasana, Instruktur, Peserta, JadwalLatihan
+import qrcode
+from io import BytesIO
+import base64
+from datetime import datetime, timedelta
+from django.utils import timezone
 
 # Sasana
 def create_sasana(request):
@@ -141,3 +146,48 @@ def delete_instruktur(request, id_instruktur):
         instruktur.delete()
         return redirect('list-instruktur')
     return render(request, 'instruktur_confirm_delete.html', {'instruktur': instruktur})
+
+# Map weekday ke nama hari
+DAY_NAME = {
+    0: 'Senin',
+    1: 'Selasa',
+    2: 'Rabu',
+    3: 'Kamis',
+    4: 'Jumat',
+    5: 'Sabtu',
+    6: 'Minggu',
+}
+
+# Show Barcode
+def show_barcode(request, sasana_id):
+    sasana = get_object_or_404(Sasana, id_sasana=sasana_id)
+
+    now = timezone.localtime()
+    today_name = DAY_NAME[now.weekday()]
+    current_time = now.time()
+
+    jadwal = JadwalLatihan.objects.filter(
+        sasana=sasana,
+        hari=today_name,
+        jam_latihan__gte=current_time
+    ).order_by('jam_latihan').first()
+
+    if not jadwal:
+        return render(request, 'show_barcode.html', {
+            'error': 'Tidak ada jadwal hari ini.',
+            'sasana': sasana,
+        })
+
+    barcode_data = f"{sasana.id_sasana}_{jadwal.id_jadwal}_{now.date()}_{jadwal.jam_latihan}"
+
+    qr = qrcode.make(barcode_data)
+    buffered = BytesIO()
+    qr.save(buffered, format="PNG")
+    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+
+    return render(request, 'show_barcode.html', {
+        'sasana': sasana,
+        'jadwal': jadwal,
+        'tanggal_jadwal': now.date(),
+        'barcode_base64': img_base64,
+    })

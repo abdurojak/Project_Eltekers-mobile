@@ -24,4 +24,7 @@ urlpatterns = [
     path('instruktur/<uuid:id_instruktur>/', views.detail_instruktur, name='detail-instruktur'),
     path('instruktur/<uuid:id_instruktur>/edit/', views.update_instruktur, name='update-instruktur'),
     path('instruktur/<uuid:id_instruktur>/hapus/', views.delete_instruktur, name='delete-instruktur'),
+    
+    # Url untuk presensi
+    path('<uuid:sasana_id>/presensi-barcode/', views.show_barcode, name='show-barcode'), 
 ]
