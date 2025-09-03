@@ -18,8 +18,17 @@
             <li class="list-group-item"><strong>Nama:</strong> {{ peserta.nama_peserta }}</li>
             <li class="list-group-item"><strong>Tanggal Lahir:</strong> {{ peserta.tanggal_lahir_peserta }}</li>
             <li class="list-group-item"><strong>Kendala Terapi:</strong> {{ peserta.kendala_terapi }}</li>
+            <li class="list-group-item">
+                <img src="data:image/png;base64,{{ qr_code }}" alt="QR Code Peserta" class="mt-2"/>
+            </li>
+            <li class="list-group-item">
+                <a href="{% url 'download-qr-peserta' peserta.id_peserta %}" class="btn btn-success btn-sm mt-2">
+                    Download QR
+                </a>
+            </li>
         </ul>
         <a href="{% url 'list-peserta' peserta.sasana.id_sasana %}" class="btn btn-secondary mt-3">Kembali</a>
     </div>
+    
 </body>
 </html>

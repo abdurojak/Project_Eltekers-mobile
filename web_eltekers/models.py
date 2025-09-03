@@ -1,6 +1,19 @@
 import uuid
 from django.db import models
+from django.contrib.auth.models import AbstractUser
 
+class CustomUser(AbstractUser):
+    ROLE_CHOICES = [
+        ('peserta', 'Peserta'),
+        ('peraga', 'Peraga'),
+        ('instruktur', 'Instruktur'),
+        ('pengurus_sasana', 'Pengurus Sasana'),
+        ('pengurus_daerah', 'Pengurus Daerah'),
+    ]
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='peserta')
+
+    def __str__(self):
+        return f"{self.username} ({self.role})"
 class OrganisasiDaerah(models.Model):
     id_organisasi_daerah = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
 
@@ -10,12 +23,7 @@ class PengurusDaerah(models.Model):
     jabatan = models.CharField(max_length=255)
 #    organisasi_daerah = models.ForeignKey(OrganisasiDaerah, on_delete=models.CASCADE)
 
-class PengurusSasana(models.Model):
-#    id_sasana = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    id_pengurus_sasana = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nama_pengurus_sasana = models.CharField(max_length=255)
-    no_telp_pengurus_sasana = models.CharField(max_length=20)
-
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
 class Sasana(models.Model):
     id_sasana = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nama_sasana = models.CharField(max_length=255)
@@ -36,6 +44,16 @@ class Sasana(models.Model):
         return self.nama_sasana
 #    pengurus_daerah = models.ForeignKey(PengurusDaerah, on_delete=models.CASCADE)
 #    pengurus_sasana = models.OneToOneField(PengurusSasana, on_delete=models.CASCADE)
+
+class PengurusSasana(models.Model):
+#    id_sasana = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id_pengurus_sasana = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    nama_pengurus_sasana = models.CharField(max_length=255)
+    no_telp_pengurus_sasana = models.CharField(max_length=20)
+    
+    sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE, null=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
+
 
 class JadwalLatihan(models.Model):
     HARI_CHOICES = [
@@ -64,6 +82,7 @@ class Instruktur(models.Model):
     file_sertifikat = models.FileField()
 
     sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE, null=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.nama_instruktur
@@ -75,6 +94,7 @@ class Peserta(models.Model):
     kendala_terapi = models.TextField()
 
     sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE, null=True)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
 
     def __str__(self):
         return self.nama_peserta
@@ -83,6 +103,7 @@ class Peraga(models.Model):
     id_peraga = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     nama_peraga = models.CharField(max_length=255)
     #sasana = models.ForeignKey(Sasana, on_delete=models.CASCADE)
+    user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, null=True, blank=True)
 
 class Pelatihan(models.Model):
     id_pelatihan = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)

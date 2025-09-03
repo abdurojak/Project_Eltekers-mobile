@@ -1,0 +1,18 @@
+<h1>Profil Saya</h1>
+<p>Username: {{ user.username }}</p>
+<p>Email: {{ user.email }}</p>
+<p>Role: {{ user.role }}</p>
+
+{% if detail %}
+  <h2>Detail {{ user.role|capfirst }}</h2>
+  <ul>
+    {% if user.role == "peserta" %}
+      <li>Nama: {{ detail.nama_peserta }}</li>
+      <li>Tanggal Lahir: {{ detail.tanggal_lahir_peserta }}</li>
+      <li>Sasana: {{ detail.sasana.nama_sasana }}</li>
+    {% elif user.role == "instruktur" %}
+      <li>Nama: {{ detail.nama_instruktur }}</li>
+      <li>Bidang: {{ detail.bidang }}</li>
+    {% endif %}
+  </ul>
+{% endif %}

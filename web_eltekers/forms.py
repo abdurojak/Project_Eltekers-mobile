@@ -1,5 +1,19 @@
 from django import forms
-from .models import Sasana, Peserta, Instruktur
+from django.contrib.auth.forms import UserCreationForm
+from .models import CustomUser, Sasana, Peserta, Instruktur
+
+class CustomUserCreationForm(UserCreationForm):
+    role = forms.ChoiceField(choices=CustomUser.ROLE_CHOICES, required=True)
+    class Meta:
+        model = CustomUser
+        fields = ("username", "email", "role", "password1", "password2")
+        
+    # def save(self, commit=True):
+    #     user = super().save(commit=False)
+    #     user.role = "peserta"  # otomatis peserta
+    #     if commit:
+    #         user.save()
+    #     return user
 
 class SasanaForm(forms.ModelForm):
     # DEFINISIKAN FIELD LOKASI SECARA EKSPLISIT DI SINI

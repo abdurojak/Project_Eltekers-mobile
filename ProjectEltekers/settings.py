@@ -26,8 +26,13 @@ SECRET_KEY = "django-insecure-w9qu&qu%f&l1hr&1ip&+1(*yj6*_ksqdi61!be=l$=(fb2949m
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
+# Gunakan custom user
+AUTH_USER_MODEL = "web_eltekers.CustomUser"
+
+LOGIN_REDIRECT_URL = "/"   # setelah login berhasil diarahkan ke homepage
+LOGOUT_REDIRECT_URL = "/login/"  # setelah logout balik ke login
 
 # Application definition
 
@@ -39,7 +44,17 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "web_eltekers",
+     # Tambahan
+    "rest_framework",
+    "rest_framework_simplejwt",
 ]
+
+# JWT Authentication
+REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    )
+}
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -73,6 +88,7 @@ WSGI_APPLICATION = "ProjectEltekers.wsgi.application"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+PRAGMA_KEY = os.environ.get("PRAGMA_KEY", "")
 
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
@@ -109,15 +125,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
-
-# TIME_ZONE = "UTC"
-TIME_ZONE = "Asia/Jakarta"
-
+LANGUAGE_CODE = 'id'
+TIME_ZONE = 'Asia/Jakarta'
 USE_I18N = True
-
 USE_TZ = True
-
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
