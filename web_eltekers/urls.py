@@ -45,10 +45,17 @@ urlpatterns = [
     path('instruktur/<uuid:id_instruktur>/edit/', views.update_instruktur, name='update-instruktur'),
     path('instruktur/<uuid:id_instruktur>/hapus/', views.delete_instruktur, name='delete-instruktur'),
     
+    # Url untuk jadwal latihan
+    path("api/jadwal-latihan/", views.jadwal_latihan_saya, name="jadwal_latihan"),
+    
     # Url untuk presensi
     path('<uuid:sasana_id>/presensi-barcode/', views.show_barcode, name='show-barcode'),
     path('api/scan/', views.presensi_scan, name='presensi-scan'),
     path("presensi-hari-ini/", views.presensi_hari_ini, name="presensi_hari_ini"),
     path("api/presensi-saya-hari-ini/", views.presensi_saya_hari_ini, name="presensi_saya_hari_ini"),
     path("api/presensi-manual/", views.presensi_manual, name="presensi_manual"),
+    path("api/sasana-terdekat/", views.sasana_terdekat, name="sasana_terdekat"),
+    path("api/registrasi/", views.registrasi, name="registrasi"),
+    path("api/riwayat-presensi/", views.riwayat_presensi, name="riwayat_presensi"),
+    path("api/presensi-bulanan/", views.presensi_bulanan, name="presensi_bulanan"),
 ]

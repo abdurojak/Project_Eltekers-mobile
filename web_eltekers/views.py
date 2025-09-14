@@ -1,3 +1,5 @@
+import math
+import re
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, render, redirect
 from .forms import CustomUserCreationForm, SasanaForm, PesertaForm, InstrukturForm
@@ -15,7 +17,7 @@ from datetime import date
 # Autentikasi
 from rest_framework.response import Response
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework_simplejwt.views import TokenObtainPairView
 from .models import *
 from .serializers import *
@@ -383,6 +385,327 @@ def presensi_manual(request):
             "status": "error",
             "message": str(e)
         }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def registrasi(request):
+    try:
+        # data dari request
+        nama = request.data.get("nama_peserta")
+        tanggal_lahir = request.data.get("tanggal_lahir_peserta")
+        kendala = request.data.get("kendala_terapi")
+        username = request.data.get("username")
+        password = request.data.get("password")
+        sasana_id = request.data.get("sasana")
+
+        if not all([nama, tanggal_lahir, username, password, sasana_id]):
+            return Response(
+                {"status": "error", "message": "Field wajib belum lengkap"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if CustomUser.objects.filter(username=username).exists():
+            return Response(
+                {"status": "error", "message": "Username sudah terpakai!"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # pastikan sasana ada
+        try:
+            sasana = Sasana.objects.get(id_sasana=sasana_id)
+        except Sasana.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Sasana tidak ditemukan"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # buat user baru
+        new_user = CustomUser.objects.create_user(
+            username=username,
+            password=password,
+            role="peserta"
+        )
+
+        # buat peserta baru
+        peserta = Peserta.objects.create(
+            nama_peserta=nama,
+            tanggal_lahir_peserta=tanggal_lahir,
+            kendala_terapi=kendala or "",
+            sasana=sasana,
+            user=new_user
+        )
+
+        return Response({
+            "status": "success",
+            "message": f"Peserta {peserta.nama_peserta} berhasil ditambahkan",
+            "data": {
+                "id_peserta": str(peserta.id_peserta),
+                "id_sasana": str(peserta.sasana.id_sasana),
+                "nama": peserta.nama_peserta
+            }
+        }, status=status.HTTP_201_CREATED)
+
+    except Exception as e:
+        print("ERROR registrasi:", e)
+        return Response({
+            "status": "error",
+            "message": str(e)
+        }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+def haversine(lat1, lon1, lat2, lon2):
+    R = 6371
+    d_lat = math.radians(lat2 - lat1)
+    d_lon = math.radians(lon2 - lon1)
+    a = (math.sin(d_lat/2)**2 +
+         math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(d_lon/2)**2)
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+    return R * c
+
+def extract_lat_lng(link_gmap):
+    if not link_gmap:
+        return None, None
+    
+    # coba format @-6.2,106.8
+    match = re.search(r'@(-?\d+\.\d+),(-?\d+\.\d+)', link_gmap)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    
+    # coba format q=-6.2,106.8
+    match = re.search(r'q=(-?\d+\.\d+),(-?\d+\.\d+)', link_gmap)
+    if match:
+        return float(match.group(1)), float(match.group(2))
+    
+    return None, None
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def sasana_terdekat(request):
+    try:
+        user_lat = float(request.GET.get("lat"))
+        user_lng = float(request.GET.get("lng"))
+    except:
+        return Response({"message": "Parameter lat dan lng wajib ada"}, status=400)
+
+    sasana_list = []
+    for sasana in Sasana.objects.all():
+        lat, lng = extract_lat_lng(sasana.link_gmap)
+        if lat is None or lng is None:
+            continue  # skip jika tidak bisa di-parse
+        jarak = haversine(user_lat, user_lng, lat, lng)
+
+        # ambil URL gambar profile (kalau ada)
+        profile_url = request.build_absolute_uri(sasana.profile.url) if sasana.profile else None
+
+        sasana_list.append({
+            "id": sasana.id_sasana,
+            "nama_sasana": sasana.nama_sasana,
+            "alamat": sasana.alamat_sasana,
+            "latitude": lat,
+            "longitude": lng,
+            "jarak_km": round(jarak, 2),
+            "link_gmap": sasana.link_gmap,
+            "profile": profile_url,
+        })
+
+    sasana_list = sorted(sasana_list, key=lambda x: x["jarak_km"])[:4]
+
+    return Response({"sasana_terdekat": sasana_list})
+
+from datetime import date
+from dateutil.relativedelta import relativedelta
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework import status
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def riwayat_presensi(request):
+    try:
+        # ambil peserta dari user yang sedang login
+        try:
+            peserta = request.user.peserta
+        except Peserta.DoesNotExist:
+            return Response(
+                {"status": "error", "message": "Peserta tidak ditemukan untuk user ini"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        # batas 3 bulan terakhir
+        three_months_ago = date.today() - relativedelta(months=3)
+
+        # ambil data presensi
+        presensi_list = Presensi.objects.filter(
+            peserta=peserta,
+            tanggal__gte=three_months_ago
+        ).order_by("-tanggal", "-waktu")
+
+        data = []
+        for p in presensi_list:
+            data.append({
+                "id_presensi": str(p.id_presensi),
+                "tanggal": p.tanggal.strftime("%Y-%m-%d"),
+                "waktu": p.waktu.strftime("%H:%M:%S"),
+                "sasana": p.sasana.nama_sasana,
+                "jadwal": p.jadwal.hari,  # langsung ambil hari
+            })      
+        return Response({
+            "status": "success",
+            "peserta": peserta.nama_peserta,
+            "riwayat_presensi": data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("ERROR riwayat_presensi:", e)
+        return Response(
+            {"status": "error", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def jadwal_latihan_saya(request):
+    try:
+        user = request.user
+
+        # tentukan sasana user dari role
+        sasana = None
+        if user.role == "instruktur":
+            instruktur = Instruktur.objects.get(user=user)
+            sasana = instruktur.sasana
+        elif user.role == "pengurus_sasana":
+            pengurus = PengurusSasana.objects.get(user=user)
+            sasana = pengurus.sasana
+        else:
+            return Response({
+                "status": "error",
+                "message": "Hanya instruktur / pengurus sasana yang boleh menambah presensi manual"
+            }, status=status.HTTP_403_FORBIDDEN)
+
+        if not sasana:
+            return Response({
+                "status": "error",
+                "message": "Sasana tidak ditemukan"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+        # ambil jadwal latihan sesuai sasana
+        jadwal_list = JadwalLatihan.objects.filter(sasana=sasana).order_by("hari", "jam_latihan")
+
+        data = []
+        for j in jadwal_list:
+            data.append({
+                "id_jadwal": str(j.id_jadwal),
+                "hari": j.hari,
+                "jam_latihan": j.jam_latihan.strftime("%H:%M"),
+                "sasana": sasana.nama_sasana,
+            })
+            
+        print("DEBUG jadwal_latihan_saya data:", data)
+
+        return Response({
+            "status": "success",
+            "sasana": sasana.nama_sasana,
+            "jadwal_latihan": data
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("ERROR jadwal_latihan_saya:", e)
+        return Response(
+            {"status": "error", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+        
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def presensi_bulanan(request):
+    try:
+        user = request.user
+        sasana = None
+
+        # tentukan sasana berdasarkan role
+        if user.role == "instruktur":
+            try:
+                instruktur = Instruktur.objects.get(user=user)
+                sasana = instruktur.sasana
+            except Instruktur.DoesNotExist:
+                return Response(
+                    {"status": "error", "message": "Instruktur tidak ditemukan"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        elif user.role == "pengurus_sasana":
+            try:
+                pengurus = PengurusSasana.objects.get(user=user)
+                sasana = pengurus.sasana
+            except PengurusSasana.DoesNotExist:
+                return Response(
+                    {"status": "error", "message": "Pengurus sasana tidak ditemukan"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+        else:
+            return Response(
+                {"status": "error", "message": "Hanya instruktur / pengurus sasana yang boleh mengakses data ini"},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        # ambil bulan & tahun dari query param
+        bulan = request.GET.get("bulan")
+        tahun = request.GET.get("tahun")
+
+        if not bulan or not tahun:
+            return Response(
+                {"status": "error", "message": "Parameter bulan dan tahun wajib diisi"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        bulan = int(bulan)
+        tahun = int(tahun)
+
+        # ambil semua peserta di sasana ini
+        peserta_list = Peserta.objects.filter(sasana=sasana)
+
+        # ambil presensi bulan & tahun tsb
+        presensi_qs = Presensi.objects.filter(
+            sasana=sasana,
+            tanggal__year=tahun,
+            tanggal__month=bulan
+        )
+
+        # ambil daftar tanggal unik
+        jadwal_tanggal = sorted(list(set(
+            [p.tanggal.strftime("%d/%m") for p in presensi_qs]
+        )))
+
+        # siapkan hasil datatable
+        hasil = []
+        for peserta in peserta_list:
+            kehadiran = {}
+            for tgl in jadwal_tanggal:
+                tanggal_obj = datetime.strptime(f"{tgl}/{tahun}", "%d/%m/%Y").date()
+                presensi = presensi_qs.filter(peserta=peserta, tanggal=tanggal_obj).first()
+
+                if presensi:
+                    kehadiran[tgl] = presensi.waktu.strftime("%H:%M")
+                else:
+                    kehadiran[tgl] = "-"
+
+            hasil.append({
+                "nama": peserta.nama_peserta,
+                "kehadiran": kehadiran
+            })
+
+        return Response({
+            "status": "success",
+            "sasana": sasana.nama_sasana,
+            "jadwalTanggal": jadwal_tanggal,
+            "pesertaList": hasil
+        }, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        print("ERROR presensi_bulanan:", e)
+        return Response(
+            {"status": "error", "message": str(e)},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
                 
 @login_required
 def me_web(request):
